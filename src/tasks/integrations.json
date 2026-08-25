@@ -1,0 +1,7 @@
+{
+  "bump": {
+    "label": "/bump (Disboard)",
+    "available": false,
+    "reason": "Aucune API/webhook officiel(le) proposé(e) par Disboard pour déclencher cette action hors du client Discord."
+  }
+}
