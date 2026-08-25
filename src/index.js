@@ -52,3 +52,9 @@ client.login(process.env.DISCORD_TOKEN).catch((err) => {
   logger.error(`Échec de connexion à Discord: ${err.message}`);
   process.exit(1);
 });
+
+import http from "http";
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => res.end("Bot en ligne")).listen(PORT, () => {
+  console.log(`Serveur HTTP factice actif sur le port ${PORT}`);
+});
