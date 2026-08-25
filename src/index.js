@@ -55,6 +55,6 @@ client.login(process.env.DISCORD_TOKEN).catch((err) => {
 
 import http from "http";
 const PORT = process.env.PORT || 3000;
-http.createServer((req, res) => res.end("Bot en ligne")).listen(PORT, () => {
-  console.log(`Serveur HTTP factice actif sur le port ${PORT}`);
+http.createServer((req, res) => res.end("Bot en ligne")).listen(PORT, "0.0.0.0", () => {
+  console.log(`Serveur HTTP actif sur le port ${PORT}`);
 });
