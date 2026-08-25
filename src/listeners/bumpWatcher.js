@@ -1,10 +1,23 @@
+import { EmbedBuilder } from "discord.js";
 import { startReminderTask } from "../tasks/manager.js";
 import { logger } from "../utils/logger.js";
 
 const DISBOARD_BOT_ID = "302050872383242240";
 const BUMP_INTERVAL_SECONDS = 2 * 60 * 60;
+
+const reminderEmbed = new EmbedBuilder()
+  .setColor(0x5865f2)
+  .setTitle("🔔 C'est l'heure du bump !")
+  .setDescription(
+    "Le serveur peut à nouveau être remonté dans les recherches Discord.\n\n" +
+    "Tape la commande `/bump` pour aider le serveur à gagner en visibilité ! 🚀"
+  )
+  .setFooter({ text: "Un bump toutes les 2 heures, ça fait une grande différence 💙" })
+  .setTimestamp();
+
 const REMINDER_MESSAGE = {
-  content: "@everyone 🔔 **C'est l'heure du bump !**\nTape `/bump` pour remonter le serveur dans les recherches Discord. 🚀",
+  content: "@everyone",
+  embeds: [reminderEmbed],
   allowedMentions: { parse: ["everyone"] },
 };
 
@@ -23,11 +36,9 @@ export function registerBumpWatcher(client) {
     try {
       if (!message.guild) return;
       if (!isDisboardSuccessMessage(message)) return;
-
       const result = startReminderTask(
         message.guild.id, "bump", BUMP_INTERVAL_SECONDS, message.channel, REMINDER_MESSAGE
       );
-
       if (result.ok) {
         logger.info(`Bump détecté dans #${message.channel.name}, rappel programmé dans 2h.`);
       } else {
