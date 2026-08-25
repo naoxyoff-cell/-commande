@@ -23,6 +23,9 @@ const REMINDER_MESSAGE = {
 
 const SUCCESS_KEYWORDS = ["effectué", "bump done", "bump effectué", "thank you for bumping", "merci d'avoir"];
 
+// Retient, par serveur, le salon où le premier bump a été détecté
+const bumpChannelByGuild = new Map();
+
 function isDisboardSuccessMessage(message) {
   if (message.author.id !== DISBOARD_BOT_ID) return false;
   const embed = message.embeds[0];
@@ -32,17 +35,32 @@ function isDisboardSuccessMessage(message) {
 }
 
 export function registerBumpWatcher(client) {
-  client.on("messageCreate", (message) => {
+  client.on("messageCreate", async (message) => {
     try {
       if (!message.guild) return;
-      if (!isDisboardSuccessMessage(message)) return;
-      const result = startReminderTask(
-        message.guild.id, "bump", BUMP_INTERVAL_SECONDS, message.channel, REMINDER_MESSAGE
-      );
-      if (result.ok) {
-        logger.info(`Bump détecté dans #${message.channel.name}, rappel programmé dans 2h.`);
-      } else {
-        logger.info(`Bump détecté dans #${message.channel.name}, rappel déjà programmé.`);
+
+      // Détection du bump réussi
+      if (isDisboardSuccessMessage(message)) {
+        if (!bumpChannelByGuild.has(message.guild.id)) {
+          bumpChannelByGuild.set(message.guild.id, message.channel.id);
+          logger.info(`Salon bump détecté et verrouillé : #${message.channel.name}`);
+        }
+
+        const result = startReminderTask(
+          message.guild.id, "bump", BUMP_INTERVAL_SECONDS, message.channel, REMINDER_MESSAGE
+        );
+        if (result.ok) {
+          logger.info(`Bump détecté dans #${message.channel.name}, rappel programmé dans 2h.`);
+        } else {
+          logger.info(`Bump détecté dans #${message.channel.name}, rappel déjà programmé.`);
+        }
+        return;
+      }
+
+      // Verrouillage : supprime tout message non-bot dans le salon bump identifié
+      const lockedChannelId = bumpChannelByGuild.get(message.guild.id);
+      if (lockedChannelId && message.channel.id === lockedChannelId && !message.author.bot) {
+        await message.delete().catch(() => {});
       }
     } catch (err) {
       logger.error(`Erreur dans bumpWatcher: ${err.message}`);
