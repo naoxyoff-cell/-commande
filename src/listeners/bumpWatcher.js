@@ -60,8 +60,8 @@ export function registerBumpWatcher(client) {
           logger.info(`Salon bump détecté et verrouillé : #${message.channel.name}`);
         }
 
-        const bumperId = lastBumperByGuild.get(message.guild.id);
-        const userMention = bumperId ? `<@${bumperId}>` : "Quelqu'un";
+        const bumperUser = message.interactionMetadata?.user ?? message.interaction?.user;
+        const userMention = bumperUser ? `<@${bumperUser.id}>` : "Quelqu'un";
 
         await message.delete().catch(() => {});
         await message.channel.send({ embeds: [buildSuccessEmbed(userMention)] }).catch(() => {});
