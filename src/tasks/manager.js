@@ -90,7 +90,15 @@ export function startIntegrationTask(guildId, integrationName, intervalSeconds, 
 
 export function startReminderTask(guildId, name, intervalSeconds, channel, payload) {
   const key = buildKey(guildId, "reminder", name);
-  if (activeTasks.has(key)) return { ok: false, reason: "already_running" };
+
+  // Si une tâche existe déjà (ex: restaurée au démarrage), on la remplace
+  // entièrement pour repartir sur un dueAt frais (évite qu'un vrai bump
+  // soit ignoré parce qu'un ancien timer tournait déjà).
+  const existing = activeTasks.get(key);
+  if (existing) {
+    existing.clear();
+    activeTasks.delete(key);
+  }
 
   const handle = scheduleRecurring(
     intervalSeconds,
@@ -101,8 +109,8 @@ export function startReminderTask(guildId, name, intervalSeconds, channel, paylo
 
   activeTasks.set(key, handle);
   saveTask(key, { guildId, kind: "reminder", name, intervalSeconds, channelId: channel.id, payload, dueAt: computeDueAt(intervalSeconds) });
-  logger.info(`Rappel '${name}' démarré (guilde ${guildId}, ${intervalSeconds}s, salon #${channel.name}).`);
-  return { ok: true };
+  logger.info(`Rappel '${name}' ${existing ? "réinitialisé" : "démarré"} (guilde ${guildId}, ${intervalSeconds}s, salon #${channel.name}).`);
+  return { ok: true, reset: !!existing };
 }
 
 export function stopTask(guildId, kind, name) {
