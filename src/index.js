@@ -1,8 +1,9 @@
-import { Client, GatewayIntentBits } from "discord.js";
+import { Client, GatewayIntentBits, Collection } from "discord.js";
 import dotenv from "dotenv";
 import { logger, banner } from "./utils/logger.js";
 import { restoreTasks, stopAllTasks } from "./tasks/manager.js";
 import { registerBumpWatcher } from "./listeners/bumpWatcher.js";
+import { loadCommands } from "./commandLoader.js";
 
 dotenv.config({ quiet: true });
 
@@ -18,11 +19,34 @@ const client = new Client({
   ],
 });
 
+client.commands = new Collection();
+
 let shuttingDown = false;
 
 client.once("clientReady", async () => {
   banner(client);
+  client.commands = await loadCommands();
+  logger.info(`${client.commands.size} commande(s) slash chargée(s).`);
   await restoreTasks(client);
+});
+
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+
+  try {
+    await command.execute(interaction);
+  } catch (err) {
+    logger.error(`Erreur dans la commande '${interaction.commandName}': ${err.message}`);
+    const errorReply = { content: "❌ Une erreur est survenue lors de l'exécution de cette commande.", ephemeral: true };
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(errorReply).catch(() => {});
+    } else {
+      await interaction.reply(errorReply).catch(() => {});
+    }
+  }
 });
 
 registerBumpWatcher(client);
