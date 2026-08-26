@@ -16,34 +16,57 @@ function buildKey(guildId, kind, name) {
   return `${guildId}:${kind}:${name}`;
 }
 
-function scheduleInternal(taskName, intervalSeconds) {
-  const taskFn = taskRegistry[taskName];
-  return setInterval(async () => {
-    try { await taskFn(); }
-    catch (err) { logger.error(`Erreur dans la tâche '${taskName}': ${err.message}`); }
-  }, intervalSeconds * 1000);
+function scheduleRecurring(intervalSeconds, initialDelayMs, action, onEachFire) {
+  let timeoutOrIntervalId;
+  let usingInterval = false;
+
+  const fire = async () => {
+    onEachFire();
+    try {
+      await action();
+    } catch (err) {
+      logger.error(`Erreur dans une tâche planifiée: ${err.message}`);
+    }
+  };
+
+  timeoutOrIntervalId = setTimeout(async () => {
+    await fire();
+    usingInterval = true;
+    timeoutOrIntervalId = setInterval(fire, intervalSeconds * 1000);
+  }, initialDelayMs);
+
+  return {
+    clear() {
+      if (usingInterval) clearInterval(timeoutOrIntervalId);
+      else clearTimeout(timeoutOrIntervalId);
+    },
+  };
 }
 
-function scheduleIntegration(integrationName, intervalSeconds, channel) {
-  return setInterval(async () => {
-    try { await runIntegration(integrationName, channel); }
-    catch (err) { logger.error(`Erreur dans l'intégration '${integrationName}': ${err.message}`); }
-  }, intervalSeconds * 1000);
+function computeDueAt(intervalSeconds) {
+  return Date.now() + intervalSeconds * 1000;
 }
 
-function scheduleReminder(payload, intervalSeconds, channel) {
-  return setInterval(async () => {
-    try { await channel.send(payload); }
-    catch (err) { logger.error(`Erreur d'envoi de rappel: ${err.message}`); }
-  }, intervalSeconds * 1000);
+function computeInitialDelayMs(intervalSeconds, dueAt) {
+  if (!dueAt) return intervalSeconds * 1000;
+  const remaining = dueAt - Date.now();
+  return Math.max(remaining, 1000);
 }
 
 export function startInternalTask(guildId, taskName, intervalSeconds) {
   const key = buildKey(guildId, "internal", taskName);
   if (activeTasks.has(key)) return { ok: false, reason: "already_running" };
 
-  activeTasks.set(key, scheduleInternal(taskName, intervalSeconds));
-  saveTask(key, { guildId, kind: "internal", name: taskName, intervalSeconds });
+  const taskFn = taskRegistry[taskName];
+  const handle = scheduleRecurring(
+    intervalSeconds,
+    intervalSeconds * 1000,
+    taskFn,
+    () => saveTask(key, { guildId, kind: "internal", name: taskName, intervalSeconds, dueAt: computeDueAt(intervalSeconds) })
+  );
+
+  activeTasks.set(key, handle);
+  saveTask(key, { guildId, kind: "internal", name: taskName, intervalSeconds, dueAt: computeDueAt(intervalSeconds) });
   logger.info(`Tâche interne '${taskName}' démarrée (guilde ${guildId}, ${intervalSeconds}s).`);
   return { ok: true };
 }
@@ -52,8 +75,15 @@ export function startIntegrationTask(guildId, integrationName, intervalSeconds, 
   const key = buildKey(guildId, "integration", integrationName);
   if (activeTasks.has(key)) return { ok: false, reason: "already_running" };
 
-  activeTasks.set(key, scheduleIntegration(integrationName, intervalSeconds, channel));
-  saveTask(key, { guildId, kind: "integration", name: integrationName, intervalSeconds, channelId: channel.id });
+  const handle = scheduleRecurring(
+    intervalSeconds,
+    intervalSeconds * 1000,
+    () => runIntegration(integrationName, channel),
+    () => saveTask(key, { guildId, kind: "integration", name: integrationName, intervalSeconds, channelId: channel.id, dueAt: computeDueAt(intervalSeconds) })
+  );
+
+  activeTasks.set(key, handle);
+  saveTask(key, { guildId, kind: "integration", name: integrationName, intervalSeconds, channelId: channel.id, dueAt: computeDueAt(intervalSeconds) });
   logger.info(`Intégration '${integrationName}' démarrée (guilde ${guildId}, ${intervalSeconds}s).`);
   return { ok: true };
 }
@@ -62,17 +92,24 @@ export function startReminderTask(guildId, name, intervalSeconds, channel, paylo
   const key = buildKey(guildId, "reminder", name);
   if (activeTasks.has(key)) return { ok: false, reason: "already_running" };
 
-  activeTasks.set(key, scheduleReminder(payload, intervalSeconds, channel));
-  saveTask(key, { guildId, kind: "reminder", name, intervalSeconds, channelId: channel.id, payload });
+  const handle = scheduleRecurring(
+    intervalSeconds,
+    intervalSeconds * 1000,
+    () => channel.send(payload),
+    () => saveTask(key, { guildId, kind: "reminder", name, intervalSeconds, channelId: channel.id, payload, dueAt: computeDueAt(intervalSeconds) })
+  );
+
+  activeTasks.set(key, handle);
+  saveTask(key, { guildId, kind: "reminder", name, intervalSeconds, channelId: channel.id, payload, dueAt: computeDueAt(intervalSeconds) });
   logger.info(`Rappel '${name}' démarré (guilde ${guildId}, ${intervalSeconds}s, salon #${channel.name}).`);
   return { ok: true };
 }
 
 export function stopTask(guildId, kind, name) {
   const key = buildKey(guildId, kind, name);
-  const intervalId = activeTasks.get(key);
-  if (!intervalId) return { ok: false, reason: "not_running" };
-  clearInterval(intervalId);
+  const handle = activeTasks.get(key);
+  if (!handle) return { ok: false, reason: "not_running" };
+  handle.clear();
   activeTasks.delete(key);
   removeTask(key);
   logger.info(`Tâche '${name}' (${kind}) arrêtée (guilde ${guildId}).`);
@@ -93,18 +130,41 @@ export async function restoreTasks(client) {
     if (activeTasks.has(key)) continue;
 
     try {
+      const initialDelayMs = computeInitialDelayMs(task.intervalSeconds, task.dueAt);
+
       if (task.kind === "internal") {
-        activeTasks.set(key, scheduleInternal(task.name, task.intervalSeconds));
+        const taskFn = taskRegistry[task.name];
+        const handle = scheduleRecurring(
+          task.intervalSeconds,
+          initialDelayMs,
+          taskFn,
+          () => saveTask(key, { ...task, dueAt: computeDueAt(task.intervalSeconds) })
+        );
+        activeTasks.set(key, handle);
         restored++;
       } else if (task.kind === "integration") {
         const channel = await client.channels.fetch(task.channelId);
-        activeTasks.set(key, scheduleIntegration(task.name, task.intervalSeconds, channel));
+        const handle = scheduleRecurring(
+          task.intervalSeconds,
+          initialDelayMs,
+          () => runIntegration(task.name, channel),
+          () => saveTask(key, { ...task, dueAt: computeDueAt(task.intervalSeconds) })
+        );
+        activeTasks.set(key, handle);
         restored++;
       } else if (task.kind === "reminder") {
         const channel = await client.channels.fetch(task.channelId);
-        activeTasks.set(key, scheduleReminder(task.payload, task.intervalSeconds, channel));
+        const handle = scheduleRecurring(
+          task.intervalSeconds,
+          initialDelayMs,
+          () => channel.send(task.payload),
+          () => saveTask(key, { ...task, dueAt: computeDueAt(task.intervalSeconds) })
+        );
+        activeTasks.set(key, handle);
         restored++;
       }
+
+      logger.info(`Tâche '${key}' restaurée, prochaine exécution dans ${Math.round(initialDelayMs / 1000)}s.`);
     } catch (err) {
       logger.error(`Impossible de restaurer la tâche '${key}': ${err.message}. Suppression.`);
       removeTask(key);
@@ -115,6 +175,6 @@ export async function restoreTasks(client) {
 }
 
 export function stopAllTasks() {
-  for (const intervalId of activeTasks.values()) clearInterval(intervalId);
+  for (const handle of activeTasks.values()) handle.clear();
   activeTasks.clear();
 }
