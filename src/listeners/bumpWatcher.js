@@ -3,7 +3,7 @@ import { startReminderTask } from "../tasks/manager.js";
 import { logger } from "../utils/logger.js";
 
 const DISBOARD_BOT_ID = "302050872383242240";
-const BUMP_INTERVAL_SECONDS = 2 * 60 * 60;
+const BUMP_INTERVAL_SECONDS = 2 * 60 * 60 + 10;
 
 const reminderEmbed = new EmbedBuilder()
   .setColor(0x5865f2)
