@@ -86,7 +86,7 @@ export function listTasks(guildId) {
 }
 
 export async function restoreTasks(client) {
-  const stored = loadAllTasks();
+  const stored = await loadAllTasks();
   let restored = 0;
 
   for (const [key, task] of Object.entries(stored)) {

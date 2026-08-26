@@ -1,40 +1,56 @@
-import fs from "fs";
-import path from "path";
+import { createClient } from "@libsql/client";
 import { logger } from "../utils/logger.js";
 
-const storePath = path.resolve("src/data/tasks.json");
+const client = createClient({
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-function readStore() {
-  if (!fs.existsSync(storePath)) return {};
+let initPromise = null;
+function ensureInit() {
+  if (!initPromise) {
+    initPromise = client.execute(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        key TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      )
+    `);
+  }
+  return initPromise;
+}
+
+export async function saveTask(key, taskData) {
   try {
-    return JSON.parse(fs.readFileSync(storePath, "utf-8"));
+    await ensureInit();
+    await client.execute({
+      sql: "INSERT INTO tasks (key, data) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET data = excluded.data",
+      args: [key, JSON.stringify(taskData)],
+    });
   } catch (err) {
-    logger.error(`Impossible de lire le fichier de tâches: ${err.message}`);
+    logger.error(`Impossible d'enregistrer la tâche '${key}' dans Turso: ${err.message}`);
+  }
+}
+
+export async function removeTask(key) {
+  try {
+    await ensureInit();
+    await client.execute({ sql: "DELETE FROM tasks WHERE key = ?", args: [key] });
+  } catch (err) {
+    logger.error(`Impossible de supprimer la tâche '${key}' dans Turso: ${err.message}`);
+  }
+}
+
+export async function loadAllTasks() {
+  try {
+    await ensureInit();
+    const result = await client.execute("SELECT key, data FROM tasks");
+    const tasks = {};
+    for (const row of result.rows) {
+      tasks[row.key] = JSON.parse(row.data);
+    }
+    return tasks;
+  } catch (err) {
+    logger.error(`Impossible de charger les tâches depuis Turso: ${err.message}`);
     return {};
   }
-}
-
-function writeStore(data) {
-  try {
-    fs.mkdirSync(path.dirname(storePath), { recursive: true });
-    fs.writeFileSync(storePath, JSON.stringify(data, null, 2));
-  } catch (err) {
-    logger.error(`Impossible d'écrire le fichier de tâches: ${err.message}`);
-  }
-}
-
-export function saveTask(key, taskData) {
-  const data = readStore();
-  data[key] = taskData;
-  writeStore(data);
-}
-
-export function removeTask(key) {
-  const data = readStore();
-  delete data[key];
-  writeStore(data);
-}
-
-export function loadAllTasks() {
-  return readStore();
 }
