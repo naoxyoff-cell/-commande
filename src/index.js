@@ -27,6 +27,7 @@ client.once("clientReady", async () => {
   banner(client);
   client.commands = await loadCommands();
   logger.info(`${client.commands.size} commande(s) slash chargée(s).`);
+  client.user.setActivity('/help', { type: 3 });
   await restoreTasks(client);
 });
 
