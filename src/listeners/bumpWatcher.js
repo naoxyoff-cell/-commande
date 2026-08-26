@@ -29,7 +29,7 @@ const reminderEmbed = new EmbedBuilder()
     "👉 Tape simplement `/bump` où que tu sois sur le serveur.\n\n" +
     "🔁 Prochain rappel automatique dans 2 heures"
   )
-  .setFooter({ text: "Pulse • Gardien du bump 💙" })
+  .setFooter({ text: "Propulsé par l'équipe Seeding Studios 🔥" })
   .setTimestamp();
 
 const REMINDER_MESSAGE = {
