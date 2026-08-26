@@ -3,3 +3,5 @@ node_modules/
 *.log
 logs/
 src/data/tasks.json
+*.bak
+*.bak2
