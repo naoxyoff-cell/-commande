@@ -5,6 +5,13 @@ import { logger } from "../utils/logger.js";
 const DISBOARD_BOT_ID = "302050872383242240";
 const BUMP_INTERVAL_SECONDS = 2 * 60 * 60 + 10;
 
+const successEmbed = new EmbedBuilder()
+  .setColor(0x5865f2)
+  .setTitle("⚡ Bump effectué !")
+  .setDescription("Merci d'avoir fait remonter le serveur ! Pulse te préviendra dans **2h** pour le prochain bump. 💙")
+  .setFooter({ text: "Pulse • Gardien du bump" })
+  .setTimestamp();
+
 const reminderEmbed = new EmbedBuilder()
   .setColor(0x5865f2)
   .setTitle("🔔 C'est l'heure du bump !")
@@ -12,7 +19,7 @@ const reminderEmbed = new EmbedBuilder()
     "Le serveur peut à nouveau être remonté dans les recherches Discord.\n\n" +
     "Tape la commande `/bump` pour aider le serveur à gagner en visibilité ! 🚀"
   )
-  .setFooter({ text: "Un bump toutes les 2 heures, ça fait une grande différence 💙" })
+  .setFooter({ text: "Pulse • Un bump toutes les 2 heures, ça fait une grande différence 💙" })
   .setTimestamp();
 
 const REMINDER_MESSAGE = {
@@ -23,7 +30,6 @@ const REMINDER_MESSAGE = {
 
 const SUCCESS_KEYWORDS = ["effectué", "bump done", "bump effectué", "thank you for bumping", "merci d'avoir"];
 
-// Retient, par serveur, le salon où le premier bump a été détecté
 const bumpChannelByGuild = new Map();
 
 function isDisboardSuccessMessage(message) {
@@ -39,12 +45,14 @@ export function registerBumpWatcher(client) {
     try {
       if (!message.guild) return;
 
-      // Détection du bump réussi
       if (isDisboardSuccessMessage(message)) {
         if (!bumpChannelByGuild.has(message.guild.id)) {
           bumpChannelByGuild.set(message.guild.id, message.channel.id);
           logger.info(`Salon bump détecté et verrouillé : #${message.channel.name}`);
         }
+
+        await message.delete().catch(() => {});
+        await message.channel.send({ embeds: [successEmbed] }).catch(() => {});
 
         const result = startReminderTask(
           message.guild.id, "bump", BUMP_INTERVAL_SECONDS, message.channel, REMINDER_MESSAGE
@@ -57,7 +65,6 @@ export function registerBumpWatcher(client) {
         return;
       }
 
-      // Verrouillage : supprime tout message non-bot dans le salon bump identifié
       const lockedChannelId = bumpChannelByGuild.get(message.guild.id);
       if (lockedChannelId && message.channel.id === lockedChannelId && !message.author.bot) {
         await message.delete().catch(() => {});
