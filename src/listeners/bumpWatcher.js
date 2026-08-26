@@ -5,12 +5,14 @@ import { logger } from "../utils/logger.js";
 const DISBOARD_BOT_ID = "302050872383242240";
 const BUMP_INTERVAL_SECONDS = 2 * 60 * 60 + 10;
 
-const successEmbed = new EmbedBuilder()
-  .setColor(0x5865f2)
-  .setTitle("⚡ Bump effectué !")
-  .setDescription("Merci d'avoir fait remonter le serveur ! Pulse te préviendra dans **2h** pour le prochain bump. 💙")
-  .setFooter({ text: "Pulse • Gardien du bump" })
-  .setTimestamp();
+function buildSuccessEmbed(userMention) {
+  return new EmbedBuilder()
+    .setColor(0x5865f2)
+    .setTitle("⚡ Bump effectué !")
+    .setDescription(`Merci ${userMention} d'avoir fait remonter le serveur ! Pulse te préviendra dans **2h** pour le prochain bump. 💙`)
+    .setFooter({ text: "Pulse • Gardien du bump" })
+    .setTimestamp();
+}
 
 const reminderEmbed = new EmbedBuilder()
   .setColor(0x5865f2)
@@ -31,6 +33,7 @@ const REMINDER_MESSAGE = {
 const SUCCESS_KEYWORDS = ["effectué", "bump done", "bump effectué", "thank you for bumping", "merci d'avoir"];
 
 const bumpChannelByGuild = new Map();
+const lastBumperByGuild = new Map();
 
 function isDisboardSuccessMessage(message) {
   if (message.author.id !== DISBOARD_BOT_ID) return false;
@@ -41,6 +44,12 @@ function isDisboardSuccessMessage(message) {
 }
 
 export function registerBumpWatcher(client) {
+  client.on("interactionCreate", (interaction) => {
+    if (interaction.isChatInputCommand() && interaction.commandName === "bump") {
+      lastBumperByGuild.set(interaction.guildId, interaction.user.id);
+    }
+  });
+
   client.on("messageCreate", async (message) => {
     try {
       if (!message.guild) return;
@@ -51,8 +60,11 @@ export function registerBumpWatcher(client) {
           logger.info(`Salon bump détecté et verrouillé : #${message.channel.name}`);
         }
 
+        const bumperId = lastBumperByGuild.get(message.guild.id);
+        const userMention = bumperId ? `<@${bumperId}>` : "Quelqu'un";
+
         await message.delete().catch(() => {});
-        await message.channel.send({ embeds: [successEmbed] }).catch(() => {});
+        await message.channel.send({ embeds: [buildSuccessEmbed(userMention)] }).catch(() => {});
 
         const result = startReminderTask(
           message.guild.id, "bump", BUMP_INTERVAL_SECONDS, message.channel, REMINDER_MESSAGE
