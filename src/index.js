@@ -1,11 +1,9 @@
+import "dotenv/config";
 import { Client, GatewayIntentBits, Collection } from "discord.js";
-import dotenv from "dotenv";
 import { logger, banner } from "./utils/logger.js";
 import { restoreTasks, stopAllTasks } from "./tasks/manager.js";
 import { registerBumpWatcher } from "./listeners/bumpWatcher.js";
 import { loadCommands } from "./commandLoader.js";
-
-dotenv.config({ quiet: true });
 
 for (const key of ["DISCORD_TOKEN", "CLIENT_ID"]) {
   if (!process.env[key]) { logger.error(`Variable manquante: ${key}`); process.exit(1); }
