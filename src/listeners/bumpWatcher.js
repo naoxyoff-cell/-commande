@@ -22,12 +22,14 @@ function buildSuccessEmbed(userMention) {
 
 const reminderEmbed = new EmbedBuilder()
   .setColor(0x5865f2)
-  .setTitle("🔔 C'est l'heure du bump !")
+  .setTitle("🔔 C'est reparti pour un bump !")
   .setDescription(
-    "Le serveur peut à nouveau être remonté dans les recherches Discord.\n\n" +
-    "Tape la commande `/bump` pour aider le serveur à gagner en visibilité ! 🚀"
+    "Le serveur peut à nouveau être boosté dans les résultats de recherche Discord — " +
+    "chaque bump aide de nouveaux membres à nous trouver plus facilement. 🌟\n\n" +
+    "👉 Tape simplement `/bump` où que tu sois sur le serveur.\n\n" +
+    "🔁 Prochain rappel automatique dans 2 heures"
   )
-  .setFooter({ text: "Pulse • Un bump toutes les 2 heures, ça fait une grande différence 💙" })
+  .setFooter({ text: "Pulse • Gardien du bump 💙" })
   .setTimestamp();
 
 const REMINDER_MESSAGE = {
