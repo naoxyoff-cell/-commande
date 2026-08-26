@@ -90,11 +90,9 @@ export function registerBumpWatcher(client) {
         const result = startReminderTask(
           message.guild.id, "bump", BUMP_INTERVAL_SECONDS, message.channel, REMINDER_MESSAGE
         );
-        if (result.ok) {
-          logger.info(`Bump détecté dans #${message.channel.name}, rappel programmé dans 2h.`);
-        } else {
-          logger.info(`Bump détecté dans #${message.channel.name}, rappel déjà programmé.`);
-        }
+        logger.info(
+          `Bump détecté dans #${message.channel.name}, rappel ${result.reset ? "réinitialisé" : "programmé"} dans 2h.`
+        );
         return;
       }
 
