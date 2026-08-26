@@ -42,6 +42,17 @@ const SUCCESS_KEYWORDS = ["effectué", "bump done", "bump effectué", "thank you
 
 const bumpChannelByGuild = new Map();
 const lastBumperByGuild = new Map();
+const processedMessageIds = new Set();
+
+function alreadyProcessed(messageId) {
+  if (processedMessageIds.has(messageId)) return true;
+  processedMessageIds.add(messageId);
+  if (processedMessageIds.size > 500) {
+    const oldest = processedMessageIds.values().next().value;
+    processedMessageIds.delete(oldest);
+  }
+  return false;
+}
 
 function isDisboardSuccessMessage(message) {
   if (message.author.id !== DISBOARD_BOT_ID) return false;
@@ -63,6 +74,8 @@ export function registerBumpWatcher(client) {
       if (!message.guild) return;
 
       if (isDisboardSuccessMessage(message)) {
+        if (alreadyProcessed(message.id)) return;
+
         if (!bumpChannelByGuild.has(message.guild.id)) {
           bumpChannelByGuild.set(message.guild.id, message.channel.id);
           logger.info(`Salon bump détecté et verrouillé : #${message.channel.name}`);
