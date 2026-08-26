@@ -16,7 +16,7 @@ function buildSuccessEmbed(userMention) {
       "🔔 Pulse te préviendra dans **2 heures** pour le prochain bump — reste connecté !\n\n" +
       "*Chaque bump compte, merci de faire vivre le serveur* 💙"
     )
-    .setFooter({ text: "Pulse • Gardien du bump" })
+    .setFooter({ text: "Propulsé par l'équipe Seeding Studios 🔥" })
     .setTimestamp();
 }
 
