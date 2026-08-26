@@ -8,8 +8,14 @@ const BUMP_INTERVAL_SECONDS = 2 * 60 * 60 + 10;
 function buildSuccessEmbed(userMention) {
   return new EmbedBuilder()
     .setColor(0x5865f2)
-    .setTitle("⚡ Bump effectué !")
-    .setDescription(`Merci ${userMention} d'avoir fait remonter le serveur ! Pulse te préviendra dans **2h** pour le prochain bump. 💙`)
+    .setTitle("⚡ Bump effectué avec succès !")
+    .setDescription(
+      `Merci ${userMention} d'avoir pris le temps de faire remonter le serveur ! 🎉 ` +
+      "Grâce à toi, notre communauté gagne en visibilité dans les recherches Discord " +
+      "et de nouveaux membres pourront plus facilement nous trouver.\n\n" +
+      "🔔 Pulse te préviendra dans **2 heures** pour le prochain bump — reste connecté !\n\n" +
+      "*Chaque bump compte, merci de faire vivre le serveur* 💙"
+    )
     .setFooter({ text: "Pulse • Gardien du bump" })
     .setTimestamp();
 }
